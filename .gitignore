@@ -13,4 +13,5 @@ Thumbs.db
 .insomnia/
 htmlcov/
 .coverage
+.env
 
