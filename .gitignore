@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.so
+myenv/
+*/migrations/__pycache__/
+*.sqlite3
+.env
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.insomnia/
+htmlcov/
+.coverage
+
