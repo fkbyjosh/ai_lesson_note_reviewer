@@ -4,13 +4,14 @@ from django.conf import settings
 from typing import Dict, Any
 import json
 import re
+from decouple import config
 
 GEMINI_API_KEY = config('GEMINI_API_KEY')
 
 class AIFeedbackGenerator:
     def __init__(self):
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')  # Free tier model
+        genai.configure(api_key=GEMINI_API_KEY)
+        self.model = genai.GenerativeModel('gemini-2.0-flash')
         
     def generate_feedback(self, lesson_note) -> Dict[str, Any]:
         """
