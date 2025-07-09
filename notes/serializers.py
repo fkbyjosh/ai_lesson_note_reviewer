@@ -22,10 +22,17 @@ class LessonNoteSerializer(serializers.ModelSerializer):
 class FeedbackSerializer(serializers.ModelSerializer):
     lesson_note_subject = serializers.CharField(source='lesson_note.subject', read_only=True)
     lesson_note_title = serializers.CharField(source='lesson_note.title', read_only=True)
+    teacher_name = serializers.CharField(source='lesson_note.teacher.name', read_only=True)
 
     class Meta:
         model = Feedback
-        fields = '__all__'
+        fields = [
+            'id', 'lesson_note', 'reviewer', 'reviewer_type', 'feedback_text', 
+            'score', 'strengths', 'suggestions', 'areas_for_improvement', 
+            'overall_assessment', 'created_at', 'lesson_note_subject', 
+            'lesson_note_title', 'teacher_name'
+        ]
+        read_only_fields = ['created_at']
 
 class RegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(
