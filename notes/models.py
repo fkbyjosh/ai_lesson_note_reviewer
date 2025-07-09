@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+import json
 
 class Teacher(models.Model):
     name = models.CharField(max_length=100)
@@ -28,11 +29,26 @@ class LessonNote(models.Model):
         return f"{self.subject} - {self.teacher.name}"
 
 class Feedback(models.Model):
+    REVIEWER_TYPES = [
+        ('AI', 'AI Generated'),
+        ('HUMAN', 'Human Reviewer'),
+    ]
+    
     lesson_note = models.ForeignKey(LessonNote, on_delete=models.CASCADE)
-    reviewer = models.CharField(max_length=100)  # could be AI or human with higher authorization
+    reviewer = models.CharField(max_length=100)
+    reviewer_type = models.CharField(max_length=10, choices=REVIEWER_TYPES, default='AI')
     feedback_text = models.TextField()
     score = models.IntegerField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    #additional AI feedback fields
+    strengths = models.JSONField(default=list, blank=True)
+    suggestions = models.JSONField(default=list, blank=True)
+    areas_for_improvement = models.JSONField(default=list, blank=True)
+    overall_assessment = models.TextField(blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
-        return f"Feedback for {self.lesson_note}"
+        return f"{self.reviewer_type} Feedback for {self.lesson_note}"
