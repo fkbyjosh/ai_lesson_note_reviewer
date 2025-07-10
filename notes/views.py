@@ -32,7 +32,8 @@ class LessonNoteViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         try:
             teacher = Teacher.objects.get(user=self.request.user)
-            return LessonNote.objects.filter(teacher=teacher)
+            lesson_note = LessonNote.objects.filter(teacher=teacher)
+            return Feedback.objects.filter(lesson_note__in=lesson_note).order_by('-created_at')
         except Teacher.DoesNotExist:
             return LessonNote.objects.none()
 
@@ -65,61 +66,19 @@ class LessonNoteViewSet(viewsets.ModelViewSet):
                 areas_for_improvement=feedback_data['areas_for_improvement'],
                 overall_assessment=feedback_data['overall_assessment']
             )
-            
+            return feedback_data
         except Exception as e:
             # Log error in production
             print(f"Failed to generate AI feedback: {str(e)}")
 
-    @action(detail=True, methods=['post'], url_path='generate-ai-feedback')
-    def generate_ai_feedback_endpoint(self, request, pk=None):
-        """
-        Manually request AI feedback for a lesson note
-        Endpoint: POST /api/lesson-notes/{id}/generate-ai-feedback/
-        """
-        lesson_note = self.get_object()
-        
-        # Check if AI feedback already exists
-        existing_feedback = Feedback.objects.filter(
-            lesson_note=lesson_note, 
-            reviewer_type='AI'
-        ).first()
-        
-        if existing_feedback:
-            return Response({
-                'message': 'AI feedback already exists for this lesson note',
-                'feedback_id': existing_feedback.id,
-                'feedback': FeedbackSerializer(existing_feedback).data
-            }, status=status.HTTP_200_OK)
-        
-        # Generate new AI feedback
-        try:
-            self.generate_ai_feedback(lesson_note)
-            
-            # Get the newly created feedback
-            new_feedback = Feedback.objects.filter(
-                lesson_note=lesson_note, 
-                reviewer_type='AI'
-            ).first()
-            
-            return Response({
-                'message': 'AI feedback generated successfully',
-                'lesson_note_id': lesson_note.id,
-                'feedback_id': new_feedback.id if new_feedback else None,
-                'feedback': FeedbackSerializer(new_feedback).data if new_feedback else None
-            }, status=status.HTTP_201_CREATED)
-            
-        except Exception as e:
-            return Response({
-                'error': 'Failed to generate AI feedback',
-                'details': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+ 
     @action(detail=True, methods=['get'], url_path='feedback')
     def get_feedback(self, request, pk=None):
         """
         Get all feedback for a lesson note
         Endpoint: GET /api/lesson-notes/{id}/feedback/
         """
+        print('what the helly')
         lesson_note = self.get_object()
         feedback = Feedback.objects.filter(lesson_note=lesson_note)
         serializer = FeedbackSerializer(feedback, many=True)
@@ -128,31 +87,6 @@ class LessonNoteViewSet(viewsets.ModelViewSet):
             'feedback_count': feedback.count(),
             'feedback': serializer.data
         })
-
-    @action(detail=True, methods=['get'], url_path='ai-feedback')
-    def get_ai_feedback(self, request, pk=None):
-        """
-        Get only AI feedback for a lesson note
-        Endpoint: GET /api/lesson-notes/{id}/ai-feedback/
-        """
-        lesson_note = self.get_object()
-        ai_feedback = Feedback.objects.filter(
-            lesson_note=lesson_note, 
-            reviewer_type='AI'
-        ).first()
-        
-        if ai_feedback:
-            return Response({
-                'lesson_note_id': lesson_note.id,
-                'has_ai_feedback': True,
-                'feedback': FeedbackSerializer(ai_feedback).data
-            })
-        else:
-            return Response({
-                'lesson_note_id': lesson_note.id,
-                'has_ai_feedback': False,
-                'message': 'No AI feedback found for this lesson note'
-            })
 
     @action(detail=True, methods=['delete'], url_path='ai-feedback')
     def delete_ai_feedback(self, request, pk=None):

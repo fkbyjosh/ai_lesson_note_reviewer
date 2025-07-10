@@ -15,11 +15,14 @@ class AIFeedbackGenerator:
     def generate_feedback(self, lesson_note) -> Dict[str, Any]:
         """
         Generate AI feedback for a lesson note
-        Returns: {
+        Returns structured feedback matching the frontend expectations:
+        {
             'feedback_text': str,
             'score': int (1-100),
+            'strengths': list,
             'suggestions': list,
-            'strengths': list
+            'areas_for_improvement': list,
+            'overall_assessment': str
         }
         """
         try:
@@ -38,9 +41,9 @@ class AIFeedbackGenerator:
                 generation_config=generation_config
             )
             
-            # Extract JSON from response
+            # Extract and validate JSON from response
             feedback_data = self._extract_json_from_response(response.text)
-            return self._validate_feedback(feedback_data)
+            return self._validate_and_structure_feedback(feedback_data)
             
         except Exception as e:
             # Log the error in production
@@ -67,19 +70,44 @@ class AIFeedbackGenerator:
             return self._parse_text_response(response_text)
     
     def _parse_text_response(self, text: str) -> Dict[str, Any]:
-        """Parse text response into structured format"""
+        """Parse text response into structured format when JSON parsing fails"""
         # Extract score if present
         score_match = re.search(r'score[:\s]+(\d+)', text, re.IGNORECASE)
         score = int(score_match.group(1)) if score_match else 75
         
+        # Extract strengths section
+        strengths_match = re.search(r'strengths?[:\s]+(.*?)(?=suggestions?|areas?|overall|$)', text, re.IGNORECASE | re.DOTALL)
+        strengths = self._extract_list_items(strengths_match.group(1)) if strengths_match else ['Lesson structure is clear']
+        
+        # Extract suggestions section
+        suggestions_match = re.search(r'suggestions?[:\s]+(.*?)(?=strengths?|areas?|overall|$)', text, re.IGNORECASE | re.DOTALL)
+        suggestions = self._extract_list_items(suggestions_match.group(1)) if suggestions_match else ['Consider adding more interactive elements']
+        
+        # Extract areas for improvement
+        areas_match = re.search(r'areas?.*?improvement[:\s]+(.*?)(?=strengths?|suggestions?|overall|$)', text, re.IGNORECASE | re.DOTALL)
+        areas = self._extract_list_items(areas_match.group(1)) if areas_match else ['Assessment methods could be enhanced']
+        
         return {
             'feedback_text': text[:500],  # Truncate if too long
             'score': min(max(score, 1), 100),
-            'strengths': ['Lesson structure is clear'],
-            'suggestions': ['Consider adding more interactive elements'],
-            'areas_for_improvement': ['Assessment methods could be enhanced'],
+            'strengths': strengths,
+            'suggestions': suggestions,
+            'areas_for_improvement': areas,
             'overall_assessment': 'Good lesson plan with room for improvement'
         }
+    
+    def _extract_list_items(self, text: str) -> list:
+        """Extract list items from text"""
+        items = []
+        # Look for bullet points or numbered lists
+        lines = text.strip().split('\n')
+        for line in lines:
+            line = line.strip()
+            if line and (line.startswith('•') or line.startswith('-') or line.startswith('*') or re.match(r'^\d+\.', line)):
+                clean_item = re.sub(r'^[•\-\*\d\.\s]+', '', line).strip()
+                if clean_item:
+                    items.append(clean_item)
+        return items[:5]  # Limit to 5 items
     
     def _create_prompt(self, lesson_note) -> str:
         """Create a structured prompt for Gemini AI"""
@@ -123,29 +151,65 @@ class AIFeedbackGenerator:
         - Provide actionable suggestions
         - Consider the grade level and subject context
         - Focus on educational best practices
+        - Ensure all arrays contain at least 2-3 items
         
         Please ensure your response is in valid JSON format.
         """
     
-    def _validate_feedback(self, feedback_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and sanitize AI response"""
-        validated = {
-            'feedback_text': feedback_data.get('feedback_text', 'No feedback provided'),
+    def _validate_and_structure_feedback(self, feedback_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate and structure AI response to match frontend expectations exactly
+        """
+        # Ensure all required fields exist with proper defaults
+        structured_feedback = {
+            'feedback_text': str(feedback_data.get('feedback_text', 'No feedback provided')),
             'score': min(max(int(feedback_data.get('score', 70)), 1), 100),
-            'strengths': feedback_data.get('strengths', [])[:5],  # Limit to 5 items
-            'suggestions': feedback_data.get('suggestions', [])[:5],
-            'areas_for_improvement': feedback_data.get('areas_for_improvement', [])[:5],
-            'overall_assessment': feedback_data.get('overall_assessment', 'Assessment not provided')
+            'strengths': self._ensure_list_format(feedback_data.get('strengths', [])),
+            'suggestions': self._ensure_list_format(feedback_data.get('suggestions', [])),
+            'areas_for_improvement': self._ensure_list_format(feedback_data.get('areas_for_improvement', [])),
+            'overall_assessment': str(feedback_data.get('overall_assessment', 'Assessment not provided'))
         }
-        return validated
+        
+        # Ensure minimum items in each list
+        if not structured_feedback['strengths']:
+            structured_feedback['strengths'] = ['Lesson shows good structure and organization']
+        
+        if not structured_feedback['suggestions']:
+            structured_feedback['suggestions'] = ['Consider adding more interactive elements', 'Include varied assessment methods']
+        
+        if not structured_feedback['areas_for_improvement']:
+            structured_feedback['areas_for_improvement'] = ['Could benefit from more detailed learning objectives']
+        
+        return structured_feedback
+    
+    def _ensure_list_format(self, data) -> list:
+        """Ensure data is in list format and properly formatted"""
+        if isinstance(data, list):
+            return [str(item).strip() for item in data if str(item).strip()][:5]  # Limit to 5 items
+        elif isinstance(data, str):
+            # Try to split string into list items
+            items = [item.strip() for item in data.split('\n') if item.strip()]
+            return items[:5]
+        else:
+            return []
     
     def _get_fallback_feedback(self) -> Dict[str, Any]:
-        """Fallback feedback if AI fails"""
+        """
+        Fallback feedback if AI fails - matches exact frontend structure
+        """
         return {
             'feedback_text': 'AI feedback temporarily unavailable. Please try again later or contact support.',
             'score': 70,
-            'strengths': ['Lesson successfully submitted for review'],
-            'suggestions': ['Please resubmit for detailed AI feedback'],
-            'areas_for_improvement': ['AI analysis pending - will be available shortly'],
-            'overall_assessment': 'Awaiting AI review - technical issue resolved soon'
+            'strengths': [
+                'Lesson successfully submitted for review',
+                'Shows commitment to educational improvement'
+            ],
+            'suggestions': [
+                'Please resubmit for detailed AI feedback',
+                'Consider reviewing lesson structure while waiting'
+            ],
+            'areas_for_improvement': [
+                'AI analysis pending - will be available shortly'
+            ],
+            'overall_assessment': 'Awaiting AI review - technical issue will be resolved soon'
         }
