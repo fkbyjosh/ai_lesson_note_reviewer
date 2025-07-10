@@ -84,33 +84,21 @@ class RegisterSerializer(serializers.ModelSerializer):
         validators=[validate_password],
         style={'input_type': 'password'}
     )
-    password2 = serializers.CharField(
-        write_only=True, 
-        required=True,
-        style={'input_type': 'password'}
-    )
-    name = serializers.CharField(
+    username = serializers.CharField(
         required=True,
         help_text="Your full name for the teacher profile"
     )
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'password', 'password2', 'name')
+        fields = ('username', 'email', 'password')
         extra_kwargs = {
             'username': {
                 'validators': [UniqueValidator(queryset=User.objects.all())]
             }
         }
 
-    def validate(self, attrs):
-        if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({"password": "Password fields didn't match."})
-        return attrs
-
     def create(self, validated_data):
-        name = validated_data.pop('name')
-        validated_data.pop('password2')
         
         user = User.objects.create_user(
             username=validated_data['username'],
@@ -121,7 +109,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Create teacher profile automatically
         Teacher.objects.create(
             user=user,
-            name=name,
+            name=validated_data['username'],
             email=user.email
         )
         

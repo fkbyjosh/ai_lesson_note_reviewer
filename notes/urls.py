@@ -19,7 +19,7 @@ urlpatterns = [
 ] + router.urls
 
 # This will generate the following URL patterns:
-# /api/register/ - POST (register new user)
+# /api/register/ - POST (register new user) - done
 # /api/profile/ - GET, PUT (get/update profile)
 # /api/teachers/ - GET, POST (list/create teachers)
 # /api/teachers/{id}/ - GET, PUT, DELETE (teacher details)

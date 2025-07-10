@@ -242,13 +242,6 @@ class RegisterView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             
-            # Create teacher profile automatically
-            Teacher.objects.create(
-                user=user,
-                name=user.username,
-                email=user.email
-            )
-            
             return Response({
                 "message": "User registered successfully.",
                 "user_id": user.id,
