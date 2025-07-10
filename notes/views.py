@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status, viewsets
 from django.contrib.auth import get_user_model
 from .models import Teacher, LessonNote, Feedback
@@ -115,6 +115,8 @@ class FeedbackViewSet(viewsets.ModelViewSet):
             return Feedback.objects.none()
 
 class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():

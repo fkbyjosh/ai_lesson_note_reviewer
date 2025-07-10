@@ -1,4 +1,3 @@
-from logging import config
 import google.generativeai as genai
 from django.conf import settings
 from typing import Dict, Any
@@ -26,7 +25,7 @@ class AIFeedbackGenerator:
         try:
             prompt = self._create_prompt(lesson_note)
             
-            #configure generation settings for better JSON output
+            # Configure generation settings for better JSON output
             generation_config = genai.types.GenerationConfig(
                 temperature=0.7,
                 max_output_tokens=1500,
@@ -39,7 +38,7 @@ class AIFeedbackGenerator:
                 generation_config=generation_config
             )
             
-            #extract JSON from response
+            # Extract JSON from response
             feedback_data = self._extract_json_from_response(response.text)
             return self._validate_feedback(feedback_data)
             
@@ -51,17 +50,17 @@ class AIFeedbackGenerator:
     def _extract_json_from_response(self, response_text: str) -> Dict[str, Any]:
         """Extract JSON from Gemini response text"""
         try:
-            #find JSON block in response
+            # Find JSON block in response
             json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(1))
             
-            #try to find JSON without code blocks
+            # Try to find JSON without code blocks
             json_match = re.search(r'(\{.*?\})', response_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(1))
             
-            #if no JSON found, create structure from text
+            # If no JSON found, create structure from text
             return self._parse_text_response(response_text)
             
         except json.JSONDecodeError:
