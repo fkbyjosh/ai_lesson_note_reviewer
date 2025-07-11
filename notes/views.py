@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status, viewsets
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from .models import Teacher, LessonNote, Feedback
 from .serializers import TeacherSerializer, LessonNoteSerializer, FeedbackSerializer, RegisterSerializer
 from rest_framework.decorators import action
@@ -37,17 +38,32 @@ class LessonNoteViewSet(viewsets.ModelViewSet):
         except Teacher.DoesNotExist:
             return LessonNote.objects.none()
 
-    def perform_create(self, serializer):
-        try:
-            teacher = Teacher.objects.get(user=self.request.user)
-            lesson_note = serializer.save(teacher=teacher)
-            
-            # Generate AI feedback automatically after creating lesson note
-            self.generate_ai_feedback(lesson_note)
-            
-        except Teacher.DoesNotExist:
-            raise status.HTTP_400_BAD_REQUEST("Teacher profile not found")
+    def create(self, request, *args, **kwargs):
 
+        try:
+            teacher = Teacher.objects.get(user=request.user)
+            
+            # Use transaction to ensure atomicity
+            with transaction.atomic():
+                serializer = self.get_serializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                lesson_note = serializer.save(teacher=teacher)
+                
+                # Generate AI feedback
+                feedback_data = self.generate_ai_feedback(lesson_note)
+                
+                if feedback_data:
+                    return Response(feedback_data, status=status.HTTP_201_CREATED)
+                else:
+                    return Response(
+                        {'error': 'Lesson note created but AI feedback generation failed'},
+                        status=status.HTTP_201_CREATED
+                    )
+                
+        except Teacher.DoesNotExist:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Teacher profile not found for this user")
+        
     def generate_ai_feedback(self, lesson_note):
         """Generate AI feedback for a lesson note"""
         try:
